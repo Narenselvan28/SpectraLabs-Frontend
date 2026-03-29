@@ -3,11 +3,9 @@ import Editor from '@monaco-editor/react';
 import axios from 'axios';
 import { Play, Send, Zap, Activity, FastForward, Clock, Database } from 'lucide-react';
 import logo from '../1723176950534.jpeg';
-import RatingModal from './RatingModal';
 import API_BASE_URL from '../apiConfig';
 
 export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) => {
-    const [isRatingOpen, setIsRatingOpen] = useState(false);
     const getTemplate = (lang) => {
         switch(lang) {
             case 'python': return "def solution(input):\n    # Your logic here\n    return input";
@@ -94,7 +92,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
     }, [question.id, question.language, onRefresh]);
 
     // Stopwatch logic with Drift Correction
-    const [drift, setDrift] = useState(0);
     useEffect(() => {
         if (startTime) {
             // Calculate drift: difference between server start time and current client time

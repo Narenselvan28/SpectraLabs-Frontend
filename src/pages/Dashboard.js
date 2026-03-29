@@ -6,10 +6,14 @@ import { EditorPanel } from '../components/EditorPanel';
 import { ContestTimer } from '../components/ContestTimer';
 import RatingModal from '../components/RatingModal';
 import { ViolationModal } from '../components/ViolationModal';
-import { RefreshCw, Trophy, LogOut, User, Activity } from 'lucide-react';
+import { 
+    RefreshCw, Trophy, LogOut, User, Activity, 
+    ShieldCheck, Terminal, HelpCircle, LayoutGrid, Zap 
+} from 'lucide-react';
 import API_BASE_URL from '../apiConfig';
-
 import logo from '../1723176950534.jpeg';
+
+axios.defaults.withCredentials = true;
 
 const Dashboard = () => {
     const [currentQuestionData, setCurrentQuestionData] = useState(null);
@@ -18,8 +22,16 @@ const Dashboard = () => {
     const navigate = useNavigate();
     const [team, setTeam] = useState(null);
     const [contest, setContest] = useState(null);
+    const [logs, setLogs] = useState([
+        { time: new Date().toLocaleTimeString(), msg: "SYSTEM_BOOT: SpectraLabs Dashboard Initialized." },
+        { time: new Date().toLocaleTimeString(), msg: "SECURITY: Encrypted uplink established." }
+    ]);
     const [violationInfo, setViolationInfo] = useState({ isOpen: false, type: '', count: 0 });
     const heartbeatTimer = useRef(null);
+
+    const addLog = (msg) => {
+        setLogs(prev => [{ time: new Date().toLocaleTimeString(), msg }, ...prev].slice(0, 10));
+    };
 
     const handleLogout = async () => {
         if (!window.confirm("Disconnect session and exit SpectraLabs?")) return;
@@ -32,21 +44,25 @@ const Dashboard = () => {
 
     const fetchCurrentQuestion = useCallback(async () => {
         try {
+            addLog("QUERYING: Fetching current mission data...");
             const res = await axios.get(`${API_BASE_URL}/api/challenges/current`);
             if (res.data.completed) {
                 setIsCompleted(true);
                 setCurrentQuestionData(null);
+                addLog("STATUS: All missions completed.");
             } else {
                 setCurrentQuestionData(res.data);
                 setIsCompleted(false);
+                addLog(`MISSION_READY: Node ${res.data.index + 1} locked.`);
             }
             const teamRes = await axios.get(`${API_BASE_URL}/api/auth/me`);
             if (teamRes.data) setTeam(teamRes.data);
-        } catch (err) {}
+        } catch (err) {
+            addLog("ERROR: Mission synchronization failed.");
+        }
     }, []);
 
     const initializeSystem = useCallback(async () => {
-        // HYDRATION: Seek local cache first to prevent UI flicker or Home redirect
         const cachedTeam = localStorage.getItem('team');
         const cachedContest = localStorage.getItem('contest_state');
         
@@ -58,7 +74,7 @@ const Dashboard = () => {
             if (statusRes.data.roundActive) {
                 setContest(statusRes.data);
                 localStorage.setItem('contest_state', JSON.stringify(statusRes.data));
-                fetchCurrentQuestion(statusRes.data.contestId);
+                fetchCurrentQuestion();
             }
             
             const teamRes = await axios.get(`${API_BASE_URL}/api/auth/me`, { timeout: 10000 });
@@ -67,36 +83,20 @@ const Dashboard = () => {
                 localStorage.setItem('team', JSON.stringify(teamRes.data));
             }
         } catch (err) {
-            console.error("[SpectraLabs] SESSION_SYNC_ERROR: ", err.response?.status || err.message);
-            // ONLY if team data is wiped we go to login
-            if (!localStorage.getItem('team')) {
-                navigate('/');
-            }
+            if (!localStorage.getItem('team')) navigate('/');
         }
     }, [fetchCurrentQuestion, navigate]);
 
-    // Minimize useEffect: Combined initialization and event listeners
     useEffect(() => {
         initializeSystem();
-        
-        // Remove aggressive polling that feels like a 'refresh'
-        const poll = setInterval(() => {
-            if (!currentQuestionData) initializeSystem();
-        }, 15000); // Relaxed polling
+        const poll = setInterval(() => { if (!currentQuestionData) initializeSystem(); }, 60000);
 
         const handleVisibility = () => { 
             const isTabActive = !document.hidden;
-            // Removed redundant reporting to save bandwidth/noise
             axios.post(`${API_BASE_URL}/api/challenges/heartbeat`, { isTabActive }).catch(()=>{});
         };
 
-        const handleBlur = () => axios.post(`${API_BASE_URL}/api/challenges/heartbeat`, { isTabActive: false }).catch(()=>{});
-        const handleFocus = () => axios.post(`${API_BASE_URL}/api/challenges/heartbeat`, { isTabActive: true }).catch(()=>{});
-
         document.addEventListener("visibilitychange", handleVisibility);
-        window.addEventListener("blur", handleBlur);
-        window.addEventListener("focus", handleFocus);
-
         heartbeatTimer.current = setInterval(() => {
             axios.post(`${API_BASE_URL}/api/challenges/heartbeat`, { isTabActive: !document.hidden && document.hasFocus() }).catch(()=>{});
         }, 10000);
@@ -104,121 +104,120 @@ const Dashboard = () => {
         return () => {
             clearInterval(poll);
             document.removeEventListener("visibilitychange", handleVisibility);
-            window.removeEventListener("blur", handleBlur);
-            window.removeEventListener("focus", handleFocus);
             if (heartbeatTimer.current) clearInterval(heartbeatTimer.current);
         };
-    }, [initializeSystem]);
+    }, [initializeSystem, currentQuestionData]);
 
-    const enterArena = () => {
-        const elem = document.documentElement;
-        if (elem.requestFullscreen) elem.requestFullscreen().catch(() => {});
-        initializeSystem();
-    };
-
+    if (!contest || !team) {
+        return (
+            <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050a06' }}>
+                <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2, repeat: Infinity }}>
+                    <div className="text-label" style={{ color: 'var(--primary)', marginBottom: '1rem' }}>CONNECTING_TO_STATION...</div>
+                    <button onClick={initializeSystem} className="btn-accent">RETRY_CONNECTION</button>
+                </motion.div>
+            </div>
+        );
+    }
 
     return (
-        <div className="dashboard-container" style={{ padding: '2rem 4rem', minHeight: '100vh', background: 'transparent', color: 'var(--text-main)' }}>
-            <AnimatePresence>
-                {!contest && (
-                    <motion.div 
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="glass-card" 
-                        style={{ padding: '5rem', textAlign: 'center', width: '600px', margin: '10vh auto', border: '1px solid var(--primary)', borderRadius: '32px' }}
-                    >
-                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2.5rem' }}>
-                            <div style={{ width: '80px', height: '80px', background: 'rgba(0, 245, 255, 0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--primary)', boxShadow: '0 0 20px rgba(0, 245, 255, 0.1)' }}>
-                                <img src={logo} alt="Logo" style={{ width: '50px', transform: 'scale(1.2)' }} />
+        <div className="dashboard-layout" style={{ display: 'flex', height: '100vh', background: '#050a06', overflow: 'hidden' }}>
+            <div className="scanline" />
+
+            {/* Side Navigation */}
+            <nav style={{ width: '280px', borderRight: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', padding: '2rem', background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(20px)', zIndex: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '3rem' }}>
+                    <img src={logo} alt="SL" style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--primary)' }} />
+                    <span style={{ fontWeight: '900', letterSpacing: '2px', fontSize: '14px', color: 'var(--primary)' }}>SPECTRALABS</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: 'auto' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '900', letterSpacing: '2px', marginBottom: '0.5rem' }}>NAVIGATION</div>
+                    <button className="btn-accent" style={{ background: 'rgba(74, 222, 128, 0.1)', borderColor: 'var(--primary)', display: 'flex', gap: '1rem', justifyContent: 'flex-start' }}>
+                        <LayoutGrid size={18} color="var(--primary)" /> Missions
+                    </button>
+                    <button onClick={() => window.open('/leaderboard', '_blank')} className="btn-accent" style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-start' }}>
+                        <Trophy size={18} /> Standings
+                    </button>
+                    <button className="btn-accent" style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-start' }}>
+                        <HelpCircle size={18} /> Support
+                    </button>
+                </div>
+
+                <div style={{ marginTop: '2rem' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '900', letterSpacing: '2px', marginBottom: '1rem' }}>MISSION_TERMINAL</div>
+                    <div className="glass" style={{ padding: '1rem', fontSize: '11px', fontFamily: 'var(--font-mono)', minHeight: '150px', background: 'rgba(0,0,0,0.6)' }}>
+                        {logs.map((log, i) => (
+                            <div key={i} style={{ marginBottom: '8px', color: log.msg.includes('ERROR') ? 'var(--error)' : 'var(--text-muted)' }}>
+                                <span style={{ opacity: 0.4 }}>[{log.time}]</span> {log.msg}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <button onClick={handleLogout} className="btn-accent" style={{ marginTop: '2rem', borderColor: 'var(--error)', color: 'var(--error)', width: '100%' }}>
+                    <LogOut size={16} /> TERMINATE_SESSION
+                </button>
+            </nav>
+
+            {/* Main Content Arena */}
+            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+                
+                {/* Global Status Bar */}
+                <header style={{ padding: '1.5rem 3rem', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0.1,0,0.2)' }}>
+                    <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary)', boxShadow: '0 0 10px var(--primary)' }} />
+                            <span style={{ fontSize: '13px', fontWeight: '800' }}>{contest.name}</span>
+                        </div>
+                        <ContestTimer startTime={contest.startTime} durationMinutes={contest.duration} />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                         <div className="glass" style={{ padding: '0.5rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.8rem', borderRadius: '50px' }}>
+                            <Zap size={16} color="var(--primary)" />
+                            <span style={{ fontWeight: '800', fontSize: '16px', color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>{team.score || 0}</span>
+                        </div>
+                        <div style={{ height: '24px', width: '1px', background: 'var(--glass-border)' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '11px', fontWeight: '900', letterSpacing: '1px' }}>{team.team_name}</div>
+                                <div style={{ fontSize: '9px', color: 'var(--primary)', fontWeight: 'bold' }}>PILOT_ACTIVE</div>
+                            </div>
+                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(74, 222, 128, 0.1)', border: '1px solid var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <User size={18} color="var(--primary)" />
                             </div>
                         </div>
-                        <h1 className="glow-text" style={{ fontSize: '3.2rem', fontWeight: '900', marginBottom: '1rem', letterSpacing: '2px' }}>Initialize Session</h1>
-                        <p className="text-muted" style={{ fontSize: '10px', letterSpacing: '3px', fontWeight: 'bold' }}>ESTABLISH SECURE CONNECTION TO SPECTRALABS</p>
-                        
-                        {!contest && (
-                            <div style={{ marginTop: '3rem' }}>
-                                <div className="animate-pulse" style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 'bold', marginBottom: '1.5rem' }}>Awaiting Arena Signal...</div>
-                                <button 
-                                    onClick={initializeSystem} 
-                                    className="btn-accent" 
-                                    style={{ fontSize: '11px', padding: '1rem 2rem' }}
-                                >
-                                    <RefreshCw size={14} /> Force Re-Establish Link
-                                </button>
-                            </div>
-                        )}
+                    </div>
+                </header>
 
-                        {contest && !currentQuestionData && (
-                            <div style={{ marginTop: '3rem' }}>
-                                <div className="animate-pulse" style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 'bold', marginBottom: '1.5rem' }}>Establishing Data Stream...</div>
-                                <button 
-                                    onClick={fetchCurrentQuestion} 
-                                    className="btn-primary" 
-                                    style={{ fontSize: '11px', padding: '1rem 2rem' }}
-                                >
-                                    <Activity size={14} /> Synchronize Mission
-                                </button>
-                            </div>
-                        )}
-
-                        {isCompleted && (
-                            <div style={{ marginTop: '3rem' }}>
-                                <div style={{ color: 'var(--success)', fontWeight: 'bold', fontSize: '1.4rem', marginBottom: '1rem' }}>MISSION_ACCOMPLISHED</div>
-                                <p className="text-muted">Leaderboard Finalized. Disconnect Node when ready.</p>
-                            </div>
-                        )}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {contest && team && (
-                <div className="arena-interface animate-fade-in">
-                    <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
-                        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginRight: '1rem' }}>
-                                <img src={logo} alt="SL" style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1px solid var(--primary)' }} />
-                                <span className="heading-section" style={{ fontSize: '18px', color: 'var(--primary)', letterSpacing: '1px' }}>SPECTRALABS</span>
-                            </div>
-                            <div className="glass" style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                                <User size={16} color="var(--primary)" />
-                                <span style={{ fontWeight: '600', fontSize: '14px' }}>{team.team_name}</span>
-                            </div>
-                            <ContestTimer startTime={contest.startTime} durationMinutes={contest.duration} onExpire={() => { console.log("[SpectraLabs] MISSION_WINDOW_CLOSED: Timer completed."); }} />
-                            <div className="glass" style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                                <Activity size={16} color="var(--success)" />
-                                <span style={{ fontWeight: '700', fontSize: '18px', color: 'var(--success)', fontFamily: 'var(--font-mono)' }}>{team.score || 0}</span>
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.8rem' }}>
-                            <button onClick={() => fetchCurrentQuestion(contest.contestId || contest.id)} className="btn-accent" style={{ padding: '0.6rem' }} title="Resume/Sync"><RefreshCw size={18} /></button>
-                            <button onClick={() => window.open('/leaderboard', '_blank')} className="btn-accent" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}><Trophy size={16} /> Rankings</button>
-                            <button onClick={handleLogout} className="btn-accent" style={{ borderColor: 'rgba(248, 113, 113, 0.2)', color: 'var(--error)' }}><LogOut size={16} /></button>
-                        </div>
-                    </header>
-
+                {/* Mission Content Area */}
+                <div style={{ flex: 1, padding: '2rem 3rem', overflowY: 'auto' }}>
                     {isCompleted ? (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card" style={{ textAlign: 'center', padding: '6rem 4rem', marginTop: '4rem' }}>
-                            <Trophy size={64} color="var(--success)" style={{ marginBottom: '2rem' }} />
-                            <h2 className="heading-title" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>Mission Accomplished</h2>
-                            <p className="text-muted" style={{ maxWidth: '600px', margin: '0 auto' }}>You have successfully navigated all missions in SpectraLabs. Your data has been finalized for the leaderboard ranking.</p>
-                            <button onClick={() => window.open('/leaderboard', '_blank')} className="btn-primary" style={{ marginTop: '2.5rem' }}>View Rankings</button>
-                        </motion.div>
+                        <div style={{ textAlign: 'center', padding: '10vh 0' }}>
+                             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card" style={{ maxWidth: '600px', margin: '0 auto', padding: '4rem' }}>
+                                <ShieldCheck size={80} color="var(--primary)" style={{ marginBottom: '2rem' }} />
+                                <h1 style={{ fontSize: '3rem', fontWeight: '900', marginBottom: '1rem' }}>Evaluation Complete</h1>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '3rem' }}>All mission parameters satisfied. Your final score has been transmitted to the Spectralabs high-command server.</p>
+                                <button onClick={() => window.open('/leaderboard', '_blank')} className="btn-primary">CHECK_GLOBAL_RANKINGS</button>
+                             </motion.div>
+                        </div>
+                    ) : currentQuestionData && currentQuestionData.question ? (
+                        <EditorPanel 
+                            key={currentQuestionData.question.id} 
+                            question={currentQuestionData.question} 
+                            index={currentQuestionData.index}
+                            total={currentQuestionData.total}
+                            onRefresh={fetchCurrentQuestion} 
+                            onComplete={() => setIsRatingOpen(true)}
+                        />
                     ) : (
-                        currentQuestionData && currentQuestionData.question && (
-                            <div className="arena-core">
-                                <EditorPanel 
-                                    key={currentQuestionData.question.id} 
-                                    question={currentQuestionData.question} 
-                                    index={currentQuestionData.index}
-                                    total={currentQuestionData.total}
-                                    onRefresh={fetchCurrentQuestion} 
-                                    onComplete={() => setIsRatingOpen(true)}
-                                />
-                            </div>
-                        )
+                        <div style={{ textAlign: 'center', marginTop: '20vh' }}>
+                            <RefreshCw size={48} className="animate-spin" color="var(--primary)" />
+                            <div className="text-label" style={{ marginTop: '2rem' }}>AWAITING_MISSION_STREAM...</div>
+                        </div>
                     )}
                 </div>
-            )}
+            </main>
 
             <RatingModal isOpen={isRatingOpen} onClose={() => setIsRatingOpen(false)} />
             <ViolationModal isOpen={violationInfo.isOpen} type={violationInfo.type} count={violationInfo.count} onClose={() => setViolationInfo({ ...violationInfo, isOpen: false })} />
