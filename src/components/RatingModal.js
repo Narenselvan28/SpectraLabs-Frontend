@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Send, ShieldCheck, X } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Star, Send, ShieldCheck } from 'lucide-react';
 import axios from 'axios';
 import API_BASE_URL from '../apiConfig';
 

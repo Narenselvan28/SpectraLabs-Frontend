@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import axios from 'axios';
@@ -11,7 +11,12 @@ const ContestSelection = () => {
     const [scanning, setScanning] = useState(false);
     const navigate = useNavigate();
 
-    const fetchContests = async () => {
+    const selectContest = (contest) => {
+        localStorage.setItem('contest_state', JSON.stringify(contest));
+        navigate('/dashboard');
+    };
+
+    const fetchContests = useCallback(async () => {
         setScanning(true);
         try {
             await axios.get(`${API_BASE_URL}/api/auth/me`);
@@ -22,16 +27,11 @@ const ContestSelection = () => {
         } finally {
             setTimeout(() => setScanning(false), 800);
         }
-    };
+    }, [navigate]);
 
     useEffect(() => {
         fetchContests();
-    }, []);
-
-    const selectContest = (contest) => {
-        localStorage.setItem('contest_state', JSON.stringify(contest));
-        navigate('/dashboard');
-    };
+    }, [fetchContests]);
 
     return (
         <div className="contest-selection-page" style={{ padding: '6rem 2rem', minHeight: '100vh', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

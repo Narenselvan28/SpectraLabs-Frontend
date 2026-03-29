@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { EditorPanel } from '../components/EditorPanel';
 import { ContestTimer } from '../components/ContestTimer';
 import RatingModal from '../components/RatingModal';
 import { ViolationModal } from '../components/ViolationModal';
 import { 
-    RefreshCw, Trophy, LogOut, User, Activity, 
-    ShieldCheck, Terminal, HelpCircle, LayoutGrid, Zap 
+    RefreshCw, Trophy, LogOut, User, 
+    ShieldCheck, LayoutGrid, Zap, HelpCircle 
 } from 'lucide-react';
 import API_BASE_URL from '../apiConfig';
 import logo from '../1723176950534.jpeg';
@@ -60,7 +60,7 @@ const Dashboard = () => {
         } catch (err) {
             addLog("ERROR: Mission synchronization failed.");
         }
-    }, []);
+    }, [navigate]);
 
     const initializeSystem = useCallback(async () => {
         const cachedTeam = localStorage.getItem('team');
@@ -123,7 +123,6 @@ const Dashboard = () => {
         <div className="dashboard-layout" style={{ display: 'flex', height: '100vh', background: '#050a06', overflow: 'hidden' }}>
             <div className="scanline" />
 
-            {/* Side Navigation */}
             <nav style={{ width: '280px', borderRight: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', padding: '2rem', background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(20px)', zIndex: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '3rem' }}>
                     <img src={logo} alt="SL" style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--primary)' }} />
@@ -159,28 +158,25 @@ const Dashboard = () => {
                 </button>
             </nav>
 
-            {/* Main Content Arena */}
             <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-                
-                {/* Global Status Bar */}
                 <header style={{ padding: '1.5rem 3rem', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0.1,0,0.2)' }}>
                     <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
                             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary)', boxShadow: '0 0 10px var(--primary)' }} />
-                            <span style={{ fontSize: '13px', fontWeight: '800' }}>{contest.name}</span>
+                            <span style={{ fontSize: '13px', fontWeight: '800' }}>{contest?.name}</span>
                         </div>
-                        <ContestTimer startTime={contest.startTime} durationMinutes={contest.duration} />
+                        <ContestTimer startTime={contest?.startTime} durationMinutes={contest?.duration} />
                     </div>
 
                     <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
                          <div className="glass" style={{ padding: '0.5rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.8rem', borderRadius: '50px' }}>
                             <Zap size={16} color="var(--primary)" />
-                            <span style={{ fontWeight: '800', fontSize: '16px', color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>{team.score || 0}</span>
+                            <span style={{ fontWeight: '800', fontSize: '16px', color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>{team?.score || 0}</span>
                         </div>
                         <div style={{ height: '24px', width: '1px', background: 'var(--glass-border)' }} />
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '11px', fontWeight: '900', letterSpacing: '1px' }}>{team.team_name}</div>
+                                <div style={{ fontSize: '11px', fontWeight: '900', letterSpacing: '1px' }}>{team?.team_name}</div>
                                 <div style={{ fontSize: '9px', color: 'var(--primary)', fontWeight: 'bold' }}>PILOT_ACTIVE</div>
                             </div>
                             <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(74, 222, 128, 0.1)', border: '1px solid var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -190,15 +186,13 @@ const Dashboard = () => {
                     </div>
                 </header>
 
-                {/* Mission Content Area */}
                 <div style={{ flex: 1, padding: '2rem 3rem', overflowY: 'auto' }}>
                     {isCompleted ? (
                         <div style={{ textAlign: 'center', padding: '10vh 0' }}>
                              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card" style={{ maxWidth: '600px', margin: '0 auto', padding: '4rem' }}>
                                 <ShieldCheck size={80} color="var(--primary)" style={{ marginBottom: '2rem' }} />
-                                <h1 style={{ fontSize: '3rem', fontWeight: '900', marginBottom: '1rem' }}>Evaluation Complete</h1>
-                                <p style={{ color: 'var(--text-muted)', marginBottom: '3rem' }}>All mission parameters satisfied. Your final score has been transmitted to the Spectralabs high-command server.</p>
-                                <button onClick={() => window.open('/leaderboard', '_blank')} className="btn-primary">CHECK_GLOBAL_RANKINGS</button>
+                                <h1 style={{ fontSize: '3rem', fontWeight: '900', marginBottom: '1rem' }}>Mission Success</h1>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '3rem' }}>Uplink complete. Your performance metrics have been stored.</p>
                              </motion.div>
                         </div>
                     ) : currentQuestionData && currentQuestionData.question ? (

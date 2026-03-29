@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Users, ClipboardList, Info, ShieldCheck, Download, Activity, FileText } from 'lucide-react';
+import { X, Users, ClipboardList, Info, ShieldCheck, Download, Activity } from 'lucide-react';
 import API_BASE_URL from '../apiConfig';
 
 const ContestSynopsisModal = ({ isOpen, onClose, contest, teams, questions = [] }) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ShieldAlert, Play, Pause, Zap, ZapOff, Trash2 } from 'lucide-react';
+import { ShieldAlert, Play, Pause, Zap, ZapOff } from 'lucide-react';
 import API_BASE_URL from '../apiConfig';
 
 const EmergencyConsole = ({ onSync }) => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import axios from 'axios';
-import { Play, Send, Zap, Activity, FastForward, Clock, Database } from 'lucide-react';
+import { Play, Send, Zap, AlertTriangle, ShieldCheck, Activity, FastForward, Clock, Database } from 'lucide-react';
 import logo from '../1723176950534.jpeg';
 import API_BASE_URL from '../apiConfig';
 
@@ -89,7 +89,7 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
-    }, [question.id, question.language, onRefresh]);
+    }, [question.id, question._id, question.language, onRefresh]);
 
     // Stopwatch logic with Drift Correction
     useEffect(() => {
