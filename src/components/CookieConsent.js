@@ -49,13 +49,13 @@ const CookieConsent = () => {
                         boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 20px rgba(74, 222, 128, 0.1)'
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                            <div style={{ 
-                                width: '48px', 
-                                height: '48px', 
-                                borderRadius: '12px', 
-                                background: 'rgba(74, 222, 128, 0.1)', 
-                                display: 'flex', 
-                                alignItems: 'center', 
+                            <div style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '12px',
+                                background: 'rgba(74, 222, 128, 0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
                                 justifyContent: 'center',
                                 border: '1px solid var(--primary)'
                             }}>
@@ -70,21 +70,21 @@ const CookieConsent = () => {
                         </div>
 
                         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                            <button 
+                            <button
                                 onClick={() => setIsVisible(false)}
-                                className="btn-accent" 
+                                className="btn-accent"
                                 style={{ padding: '0.8rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}
                                 title="Dismiss"
                             >
                                 <X size={18} />
                             </button>
-                            <button 
+                            <button
                                 onClick={handleAccept}
-                                className="btn-primary" 
-                                style={{ 
-                                    padding: '1rem 2rem', 
-                                    borderRadius: '50px', 
-                                    fontSize: '12px', 
+                                className="btn-primary"
+                                style={{
+                                    padding: '1rem 2rem',
+                                    borderRadius: '50px',
+                                    fontSize: '12px',
                                     fontWeight: '900',
                                     display: 'flex',
                                     alignItems: 'center',
