@@ -188,11 +188,6 @@ const Dashboard = () => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '2rem' }}>
-                    {!isCompleted && (
-                        <button onClick={() => fetchCurrentQuestion()} className="btn-accent" style={{ width: '100%', fontSize: '12px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                            <RefreshCw size={14} /> Refresh Contest
-                        </button>
-                    )}
                     <button onClick={handleLogout} className="btn-accent" style={{ borderColor: 'rgba(248, 113, 113, 0.2)', color: 'var(--error)', width: '100%', fontSize: '12px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
                         <LogOut size={14} /> Logout
                     </button>
