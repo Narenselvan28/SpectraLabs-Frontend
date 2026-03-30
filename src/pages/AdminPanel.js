@@ -291,7 +291,7 @@ const AdminPanel = () => {
                                                 <td style={{ padding: '1.4rem 1rem' }}>
                                                     <code style={{ background: 'rgba(255,255,255,0.03)', padding: '3px 8px', borderRadius: '4px', fontSize: '11px' }}>{t.code}</code>
                                                 </td>
-                                                <td style={{ padding: '1.4rem 1rem' }}><span style={{ color: 'var(--primary)', fontWeight: 'bold', fontSize: '12px' }}>Question {t.current_question_index + 1}</span></td>
+                                                <td style={{ padding: '1.4rem 1rem' }}><span style={{ color: 'var(--primary)', fontWeight: 'bold', fontSize: '12px' }}>{t.current_question_index + 1}</span></td>
                                                 <td style={{ padding: '1.4rem 1rem' }}>
                                                     <ActivityStatus isActive={t.is_tab_active} lastHeartbeat={t.last_heartbeat} />
                                                 </td>

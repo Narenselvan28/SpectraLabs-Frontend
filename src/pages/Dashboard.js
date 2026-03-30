@@ -51,6 +51,7 @@ const Dashboard = () => {
     }, []);
 
     const fetchCurrentQuestion = useCallback(async () => {
+        // If already completed, don't flicker back unless forced
         try {
             const res = await axios.get(`${API_BASE_URL}/api/challenges/current`);
             if (res.data.completed) {
@@ -101,11 +102,20 @@ const Dashboard = () => {
         }
     }, [fetchCurrentQuestion, navigate]);
 
+    // Initial Load Only
     useEffect(() => {
         initializeSystem();
-        const poll = setInterval(() => { if (!currentQuestionData) initializeSystem(); }, 60000);
+    }, [initializeSystem]);
+
+    // Background Tasks
+    useEffect(() => {
+        const poll = setInterval(() => { 
+            // Only poll if contest is NOT finished
+            if (!isCompleted && !currentQuestionData) initializeSystem(); 
+        }, 60000);
 
         const handleVisibility = () => { 
+            if (isCompleted) return; // Stop violation tracking once finished
             const isTabActive = !document.hidden;
             if (!isTabActive) {
                 axios.post(`${API_BASE_URL}/api/challenges/violation`, { type: 'TAB_SWITCH' })
@@ -118,6 +128,7 @@ const Dashboard = () => {
         };
 
         const heartbeatFired = () => {
+            if (isCompleted) return;
             axios.post(`${API_BASE_URL}/api/challenges/heartbeat`, { isTabActive: !document.hidden }).catch(()=>{});
         };
 
@@ -129,7 +140,7 @@ const Dashboard = () => {
             document.removeEventListener("visibilitychange", handleVisibility);
             if (heartbeatTimer.current) clearInterval(heartbeatTimer.current);
         };
-    }, [initializeSystem, currentQuestionData]);
+    }, [isCompleted, currentQuestionData, initializeSystem]);
 
     if (!contest || !team) {
         return (
@@ -156,10 +167,10 @@ const Dashboard = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: 'auto' }}>
                     <span className="text-label" style={{ marginBottom: '0.5rem', opacity: 0.4, fontSize: '9px' }}>CHANNELS</span>
                     <button className="btn-primary" style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-start', padding: '1rem', borderRadius: '10px', background: 'rgba(74, 222, 128, 0.15)', borderColor: 'var(--primary)', fontSize: '13px' }}>
-                        <LayoutGrid size={16} /> Current Exam
+                        <LayoutGrid size={16} /> Current Contest
                     </button>
                     
-                    {!isFullscreen && (
+                    {!isFullscreen && !isCompleted && (
                         <button onClick={enterFullscreen} className="btn-accent" style={{ display: 'flex', gap: '1rem', color: 'var(--accent)', borderColor: 'var(--accent)', justifyContent: 'flex-start', padding: '1rem', borderRadius: '10px', marginTop: '1rem', fontSize: '13px' }}>
                             <Maximize size={16} /> Enter Fullscreen
                         </button>
@@ -167,9 +178,11 @@ const Dashboard = () => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '2rem' }}>
-                    <button onClick={() => fetchCurrentQuestion()} className="btn-accent" style={{ width: '100%', fontSize: '12px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                        <RefreshCw size={14} /> Refresh Exam
-                    </button>
+                    {!isCompleted && (
+                        <button onClick={() => fetchCurrentQuestion()} className="btn-accent" style={{ width: '100%', fontSize: '12px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                            <RefreshCw size={14} /> Refresh Contest
+                        </button>
+                    )}
                     <button onClick={handleLogout} className="btn-accent" style={{ borderColor: 'rgba(248, 113, 113, 0.2)', color: 'var(--error)', width: '100%', fontSize: '12px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
                         <LogOut size={14} /> Logout
                     </button>
@@ -184,7 +197,7 @@ const Dashboard = () => {
                             <span style={{ fontSize: '13px', fontWeight: '900', textTransform: 'uppercase' }}>{contest.name}</span>
                         </div>
                         <div style={{ height: '20px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />
-                        <ContestTimer startTime={contest.startTime} durationMinutes={contest.duration} />
+                        <ContestTimer startTime={contest.startTime} durationMinutes={contest.duration} onExpire={() => setIsCompleted(true)} />
                     </div>
 
                     <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>

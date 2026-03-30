@@ -52,20 +52,20 @@ const ContestSelection = () => {
                     <Cpu size={14} color="var(--primary)" />
                     <span style={{ fontSize: '10px', fontWeight: '900', color: 'var(--primary)' }}>SYSTEM: READY</span>
                 </motion.div>
-                <h1 style={{ fontSize: '2.5rem', fontWeight: '900', letterSpacing: '-1px', marginBottom: '0.8rem' }}>Choose Your Exam</h1>
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', maxWidth: '400px', lineHeight: '1.5' }}>Please select an available exam from the list below to start your evaluation.</p>
+                <h1 style={{ fontSize: '2.5rem', fontWeight: '900', letterSpacing: '-1px', marginBottom: '0.8rem' }}>Choose Your Contest</h1>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', maxWidth: '400px', lineHeight: '1.5' }}>Please select an available contest from the list below to start your evaluation.</p>
             </header>
 
             <button onClick={fetchContests} className="btn-accent" style={{ padding: '0.8rem 2rem', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '3.5rem', borderRadius: '50px', zIndex: 10, fontSize: '12px' }}>
                 <RefreshCw size={16} className={scanning ? "animate-spin" : ""} />
-                {scanning ? "Searching..." : "Refresh Exams"}
+                {scanning ? "Searching..." : "Refresh Contests"}
             </button>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', maxWidth: '1100px', width: '100%', margin: '0 auto', zIndex: 10 }}>
                 {contests.length === 0 && !scanning && (
                     <div className="glass-card" style={{ padding: '3rem', gridColumn: '1 / -1', textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>
                         <Terminal size={40} style={{ marginBottom: '1rem', opacity: 0.2 }} />
-                        <div style={{ fontSize: '12px', fontWeight: '900' }}>No Exams Found</div>
+                        <div style={{ fontSize: '12px', fontWeight: '900' }}>No Contests Found</div>
                     </div>
                 )}
 
@@ -84,7 +84,7 @@ const ContestSelection = () => {
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--primary)', fontWeight: '900', fontSize: '12px', paddingTop: '1.2rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            <span>START EXAM</span>
+                            <span>START CONTEST</span>
                             <ArrowRight size={16} />
                         </div>
                     </motion.div>

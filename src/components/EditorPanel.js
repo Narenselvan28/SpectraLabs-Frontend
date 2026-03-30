@@ -6,6 +6,8 @@ import logo from '../1723176950534.jpeg';
 import API_BASE_URL from '../apiConfig';
 
 export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) => {
+    const qId = question.id || question._id;
+
     const getTemplate = (lang) => {
         switch(lang) {
             case 'python': return "def solution(input):\n    # Your logic here\n    return input";
@@ -17,33 +19,36 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
     };
 
     const [selectedLanguage, setSelectedLanguage] = useState(() => {
-        const qId = question.id || question._id;
-        return localStorage.getItem(`spectra_lang_${qId}`) || question.language || 'javascript';
+        return localStorage.getItem(`spectra_active_lang_${qId}`) || question.language || 'java';
     });
     
     const [code, setCode] = useState(() => {
-        const qId = question.id || question._id;
-        return localStorage.getItem(`spectra_code_${qId}`) || getTemplate(question.language || 'javascript');
+        const lang = localStorage.getItem(`spectra_active_lang_${qId}`) || question.language || 'java';
+        return localStorage.getItem(`spectra_code_${qId}_${lang}`) || getTemplate(lang);
     });
 
     const handleLanguageChange = (lang) => {
         setSelectedLanguage(lang);
-        const qId = question.id || question._id;
-        localStorage.setItem(`spectra_lang_${qId}`, lang);
-        const templ = getTemplate(lang);
-        setCode(templ);
-        localStorage.setItem(`spectra_code_${qId}`, templ);
+        localStorage.setItem(`spectra_active_lang_${qId}`, lang);
+        
+        // Load code for this specific language if it exists in cache
+        const cached = localStorage.getItem(`spectra_code_${qId}_${lang}`);
+        if (cached) {
+            setCode(cached);
+        } else {
+            const templ = getTemplate(lang);
+            setCode(templ);
+            localStorage.setItem(`spectra_code_${qId}_${lang}`, templ);
+        }
     };
 
     const handleCodeChange = (val) => {
         setCode(val);
-        const qId = question.id || question._id;
-        localStorage.setItem(`spectra_code_${qId}`, val);
+        localStorage.setItem(`spectra_code_${qId}_${selectedLanguage}`, val);
     };
 
     const handleBbInputChange = (val) => {
         setBbInput(val);
-        const qId = question.id || question._id;
         localStorage.setItem(`spectra_bb_${qId}`, val);
     };
     
@@ -54,11 +59,9 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
 
     // Custom Test State
     const [bbInput, setBbInput] = useState(() => {
-        const qId = question.id || question._id;
         return localStorage.getItem(`spectra_bb_${qId}`) || '';
     });
 
-    // State persistence handled by event handlers now (Fix #User-Request)
     const [bbOutput, setBbOutput] = useState(null);
     const [bbRunning, setBbRunning] = useState(false);
     const [testRunning, setTestRunning] = useState(false);
@@ -70,7 +73,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
     useEffect(() => {
         const initMission = async () => {
             try {
-                const qId = question.id || question._id;
                 const res = await axios.post(`${API_BASE_URL}/api/challenges/start-question`, {
                     question_id: qId
                 });
@@ -78,7 +80,7 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                     setStartTime(Number(res.data.startTime));
                 }
             } catch (err) {
-                console.error("Failed to sync mission clock.");
+                console.error("Failed to sync contest clock.");
             }
         };
 
@@ -89,20 +91,13 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
-    }, [question.id, question._id, question.language, onRefresh]);
+    }, [qId, onRefresh]);
 
-    // Stopwatch logic with Drift Correction
     useEffect(() => {
         if (startTime) {
-            // Calculate drift: difference between server start time and current client time
-            // since we just fetched startTime, we assume it's "now" on server.
-            // But startTime is the ORIGINAL start time. So we need the server's CURRENT time too.
-            // Simplified: we'll just track the elapsed time from the moment we received it.
             if (timerRef.current) clearInterval(timerRef.current);
-            
             const initialElapsed = Date.now() - startTime;
             setElapsedTime(initialElapsed > 0 ? initialElapsed : 0);
-
             timerRef.current = setInterval(() => {
                 const now = Date.now();
                 const currentElapsed = now - startTime;
@@ -111,11 +106,9 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         }
     }, [startTime]);
 
-    // Fix #4: IGNORE ESC DURING CONTEST
     useEffect(() => {
         const handleEsc = (e) => {
             if (e.key === 'Escape') {
-                console.log("[SpectraLabs] ESC suppressed during active mission.");
                 e.preventDefault();
             }
         };
@@ -123,7 +116,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         return () => window.removeEventListener('keydown', handleEsc);
     }, []);
 
-    // Fix #7: Submit Debounce logic
     const [lastSubmitTime, setLastSubmitTime] = useState(0);
 
     const formatTime = (ms) => {
@@ -137,24 +129,19 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         const expectedType = question.input_type?.toLowerCase() || 'array';
         let parsed;
         let isValid = false;
-
         try {
-            // STEP 1: Attempt JSON Parse for structured data (Arrays, Objects, Matrix)
             const trimmed = inputStr.trim();
             if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || 
                 (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
                 (!isNaN(trimmed) && trimmed.length > 0)) {
                 parsed = JSON.parse(trimmed);
             } else if (expectedType === 'string') {
-                // If expected type is string and it's not bracketed, treat as raw string
                 parsed = inputStr;
                 isValid = true;
             } else {
-                // Force parse for other types to keep consistency
                 parsed = JSON.parse(inputStr);
             }
         } catch (e) {
-            // STEP 2: Fallback for RAW STRINGS if type permits
             if (expectedType === 'string') {
                 parsed = inputStr;
                 isValid = true;
@@ -162,7 +149,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                 return { error: "Invalid JSON format. Check brackets and quotes for " + expectedType.toUpperCase() + " type." };
             }
         }
-
         if (!isValid) {
             switch(expectedType) {
                 case "array": isValid = Array.isArray(parsed); break;
@@ -173,7 +159,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                 default: isValid = true;
             }
         }
-
         if (!isValid) return { error: `Type Mismatch: Expected ${expectedType.toUpperCase()}` };
         return { success: true, parsed };
     };
@@ -185,10 +170,8 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
             setBbOutput(`Error: ${validation.error}`);
             return;
         }
-
         setBbRunning(true);
         try {
-            const qId = question.id || question._id;
             const res = await axios.post(`${API_BASE_URL}/api/challenges/run`, {
                 question_id: qId,
                 input: bbInput
@@ -213,10 +196,8 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
             setBbOutput(`Error: ${validation.error}`);
             return;
         }
-
         setTestRunning(true);
         try {
-            const qId = question.id || question._id;
             const res = await axios.post(`${API_BASE_URL}/api/challenges/test-code`, {
                 question_id: qId,
                 code: code,
@@ -238,23 +219,19 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
 
     const submitSolution = async () => {
         const now = Date.now();
-        if (submitting || (now - lastSubmitTime < 2000)) return; // Fix #7: 2s debounce
-        
+        if (submitting || (now - lastSubmitTime < 2000)) return;
         setLastSubmitTime(now);
         setSubmitting(true);
         setFeedback(null);
-
-        const qId = question.id || question._id;
         const payload = {
             question_id: qId,
             code: code,
             language: selectedLanguage
         };
-
         const attemptSubmit = async (retryCount = 0) => {
             try {
                 const res = await axios.post(`${API_BASE_URL}/api/challenges/submit`, payload, {
-                    timeout: 15000 // 15-second timeout for slow networks
+                    timeout: 15000 
                 });
                 setFeedback({
                     success: res.data.success,
@@ -263,16 +240,18 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                     expected: res.data.expected,
                     received: res.data.received
                 });
-                
                 if (res.data.success) {
-                    const qId = question.id || question._id;
                     if (timerRef.current) clearInterval(timerRef.current);
-                    localStorage.removeItem(`spectra_code_${qId}`);
-                    localStorage.removeItem(`spectra_lang_${qId}`);
-                    localStorage.removeItem(`spectra_bb_${qId}`);
-                    // Success! No longer "uploading"
-                    setSubmitting(false);
                     
+                    // Clear specific language caches for THIS question on success
+                    const langs = ['java', 'python', 'javascript', 'cpp', 'c'];
+                    langs.forEach(l => {
+                        localStorage.removeItem(`spectra_code_${qId}_${l}`);
+                    });
+                    localStorage.removeItem(`spectra_active_lang_${qId}`);
+                    localStorage.removeItem(`spectra_bb_${qId}`);
+                    
+                    setSubmitting(false);
                     if (index + 1 === total) {
                         setTimeout(() => onComplete(), 1000);
                     }
@@ -281,16 +260,13 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                     setSubmitting(false);
                 }
             } catch (err) {
-                // Retry once on network timeout/error (backend is idempotent)
                 if (retryCount === 0 && (!err.response || err.code === 'ECONNABORTED')) {
-                    console.warn('[SpectraLabs] Network error, retrying submission...');
                     return attemptSubmit(1);
                 }
                 setFeedback({ success: false, error: err.response?.data?.error || "Network Error — Submission failed. Try again." });
                 setSubmitting(false);
             }
         };
-
         await attemptSubmit();
     };
 
@@ -298,11 +274,16 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         if (!window.confirm("Are you sure? Skipping locks this data node securely. You cannot return.")) return;
         setSkipping(true);
         try {
-            const qId = question.id || question._id;
             await axios.post(`${API_BASE_URL}/api/challenges/skip`, { question_id: qId });
-            localStorage.removeItem(`spectra_code_${qId}`);
-            localStorage.removeItem(`spectra_lang_${qId}`);
+            
+            // Clear caches
+            const langs = ['java', 'python', 'javascript', 'cpp', 'c'];
+            langs.forEach(l => {
+                localStorage.removeItem(`spectra_code_${qId}_${l}`);
+            });
+            localStorage.removeItem(`spectra_active_lang_${qId}`);
             localStorage.removeItem(`spectra_bb_${qId}`);
+            
             onRefresh();
         } catch (err) {
             setSkipping(false);
@@ -313,7 +294,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         if (val === null || val === undefined) return "N/A";
         if (typeof val === 'object') return JSON.stringify(val, null, 2);
         try {
-            // If it's a string, try to parse it. If it's valid JSON, pretty-print it.
             const parsed = JSON.parse(val);
             if (typeof parsed === 'object') return JSON.stringify(parsed, null, 2);
             return String(val);
@@ -324,22 +304,17 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
 
     return (
         <div className="editor-layout">
-            
-            {/* Left Column: Problem & Custom Test */}
             <div className="left-pane">
-                
-                {/* Branding Header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0' }}>
                     <img src={logo} alt="SL" style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--primary)' }} />
-                    <span className="text-label" style={{ fontWeight: '800', fontSize: '12px', color: 'var(--primary)', letterSpacing: '2px' }}>SPECTRALABS MISSION</span>
+                    <span className="text-label" style={{ fontWeight: '800', fontSize: '12px', color: 'var(--primary)', letterSpacing: '2px' }}>SPECTRALABS CONTEST</span>
                 </div>
 
-                {/* 1. Problem Description */}
                 <div className="glass-card" style={{ padding: '1.5rem' }}>
                     <div className="flex-between" style={{ marginBottom: '1rem' }}>
                         <div>
                             <span className="text-label" style={{ display: 'block', marginBottom: '4px' }}>
-                                Mission {index + 1} of {total}
+                                {index + 1}
                             </span>
                             <h2 className="heading-title">{question.title}</h2>
                         </div>
@@ -366,12 +341,11 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                         Deduce the hidden pattern by utilizing the SpectraLabs Sandbox below. Construct the precise algorithm when ready.
                     </p>
 
-                    {/* Mission Data Specification */}
                     <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         <div className="glass-card" style={{ padding: '1rem', border: '1px solid rgba(0, 245, 255, 0.15)', background: 'rgba(0,0,0,0.2)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
                                 <Database size={14} color="var(--primary)" />
-                                <h4 style={{ fontSize: '11px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '2px' }}>MISSION_DATA_SPECIFICATION</h4>
+                                <h4 style={{ fontSize: '11px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '2px' }}>CONTEST_DATA_SPECIFICATION</h4>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
@@ -406,7 +380,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                             </div>
                         </div>
 
-                        {/* Legacy Examples Fallback - Show only if explicitly needed or as secondary data */}
                         {JSON.parse(question.examples || "[]").length > 0 && (
                             <div style={{ padding: '0 1rem' }}>
                                 <h5 style={{ fontSize: '9px', color: 'var(--muted)', marginBottom: '0.5rem' }}>ADDITIONAL_PROBES</h5>
@@ -420,7 +393,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                     </div>
                 </div>
 
-                {/* 2. Custom Test Panel */}
                 <div className="glass-card" style={{ padding: '1.5rem', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.2rem' }}>
                         <Zap size={16} color="var(--accent)" />
@@ -477,7 +449,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                 </div>
             </div>
 
-            {/* Right Column: Code Editor */}
             <div className="right-pane">
                 <div className="glass solution-editor-card">
                     <div style={{ background: 'var(--bg-elevated)', padding: '0.8rem 1.5rem', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -498,9 +469,9 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                                     cursor: 'pointer'
                                 }}
                             >
-                                <option value="javascript">JAVASCRIPT</option>
-                                <option value="python">PYTHON</option>
                                 <option value="java">JAVA</option>
+                                <option value="python">PYTHON</option>
+                                <option value="javascript">JAVASCRIPT</option>
                                 <option value="cpp">C++</option>
                                 <option value="c">C</option>
                             </select>
@@ -528,7 +499,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                     </div>
                 </div>
 
-                {/* Feedback Panel */}
                 {feedback && (
                     <div className="glass animate-fade-in" style={{ 
                         padding: '1.2rem', 
@@ -538,7 +508,7 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h4 style={{ color: feedback.success ? 'var(--success)' : 'var(--error)', fontSize: '14px', fontWeight: '600' }}>
-                                {feedback.success ? 'MISSION SUCCESS' : 'SYSTEM MALFUNCTION: TEST FAILED'}
+                                {feedback.success ? 'CONTEST SUCCESS' : 'SYSTEM MALFUNCTION: TEST FAILED'}
                             </h4>
                             {feedback.success && <span style={{ fontWeight: 'bold', color: 'var(--success)', fontSize: '14px' }}>+{feedback.score} XP</span>}
                         </div>
@@ -566,7 +536,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                     </div>
                 )}
 
-                {/* Action Row - Strict Linear Flow */}
                 <div style={{ display: 'flex', gap: '1rem', flexShrink: 0 }}>
                     <button 
                         onClick={skipQuestion}
@@ -575,7 +544,7 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                         style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem', padding: '1rem', fontSize: '14px' }}
                     >
                         {skipping ? <Activity className="animate-spin" size={18} /> : <FastForward size={18} />}
-                        Skip Mission
+                        Skip Question
                     </button>
 
                     <button 
@@ -585,11 +554,10 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
                         style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem', padding: '1rem', fontSize: '14px' }}
                     >
                         {submitting ? <Activity className="animate-spin" size={18} /> : <Send size={18} />}
-                        {submitting ? "UPLOADING DATA..." : "Finalize Mission"}
+                        {submitting ? "UPLOADING DATA..." : "Finalize Question"}
                     </button>
                 </div>
             </div>
-            
         </div>
     );
 };

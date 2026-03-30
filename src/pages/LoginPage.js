@@ -61,8 +61,8 @@ const LoginPage = () => {
                 <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: 'auto' }}>
                     <img src={logo} alt="SL" style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid var(--primary)' }} />
                     <div>
-                        <span style={{ fontSize: '13px', fontWeight: '900', letterSpacing: '2px', color: 'var(--primary)', display: 'block' }}>EXAM_PORTAL</span>
-                        <span style={{ fontSize: '9px', opacity: 0.3 }}>Student Login</span>
+                        <span style={{ fontSize: '13px', fontWeight: '900', letterSpacing: '2px', color: 'var(--primary)', display: 'block' }}>CONTEST_PORTAL</span>
+                        <span style={{ fontSize: '9px', opacity: 0.3 }}>Hacker Login</span>
                     </div>
                 </motion.div>
 
