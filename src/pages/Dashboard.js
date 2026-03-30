@@ -51,8 +51,15 @@ const Dashboard = () => {
     }, []);
 
     const fetchCurrentQuestion = useCallback(async () => {
-        // If already completed, don't flicker back unless forced
         try {
+            // First check if contest is still active
+            const statusRes = await axios.get(`${API_BASE_URL}/api/status`, { timeout: 5000 });
+            if (!statusRes.data.roundActive) {
+                alert("The contest is not currently active.");
+                navigate('/select-contest');
+                return;
+            }
+
             const res = await axios.get(`${API_BASE_URL}/api/challenges/current`);
             if (res.data.completed) {
                 setIsCompleted(true);
@@ -87,6 +94,9 @@ const Dashboard = () => {
                 setContest(statusRes.data);
                 localStorage.setItem('contest_state', JSON.stringify(statusRes.data));
                 fetchCurrentQuestion();
+            } else {
+                // If not active and we're try to init, go back to selection
+                navigate('/select-contest');
             }
             
             const teamRes = await axios.get(`${API_BASE_URL}/api/auth/me`, { timeout: 10000 });

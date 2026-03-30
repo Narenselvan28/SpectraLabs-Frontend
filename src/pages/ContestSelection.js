@@ -12,6 +12,10 @@ const ContestSelection = () => {
     const navigate = useNavigate();
 
     const selectContest = (contest) => {
+        if (!contest.is_active) {
+            alert("This contest has not started yet. Please wait for the administrator to activate it.");
+            return;
+        }
         localStorage.setItem('contest_state', JSON.stringify(contest));
         navigate('/dashboard');
     };
