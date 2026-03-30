@@ -31,7 +31,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         setSelectedLanguage(lang);
         localStorage.setItem(`spectra_active_lang_${qId}`, lang);
         
-        // Load code for this specific language if it exists in cache
         const cached = localStorage.getItem(`spectra_code_${qId}_${lang}`);
         if (cached) {
             setCode(cached);
@@ -52,12 +51,10 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         localStorage.setItem(`spectra_bb_${qId}`, val);
     };
     
-    // Timer State
     const [startTime, setStartTime] = useState(null);
     const [elapsedTime, setElapsedTime] = useState(0);
     const timerRef = useRef(null);
 
-    // Custom Test State
     const [bbInput, setBbInput] = useState(() => {
         return localStorage.getItem(`spectra_bb_${qId}`) || '';
     });
@@ -69,7 +66,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
     const [skipping, setSkipping] = useState(false);
     const [feedback, setFeedback] = useState(null);
 
-    // Initialize/Sync Timer on question change
     useEffect(() => {
         const initMission = async () => {
             try {
@@ -91,7 +87,7 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
-    }, [qId, onRefresh]);
+    }, [qId]);
 
     useEffect(() => {
         if (startTime) {
@@ -106,18 +102,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         }
     }, [startTime]);
 
-    useEffect(() => {
-        const handleEsc = (e) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-            }
-        };
-        window.addEventListener('keydown', handleEsc);
-        return () => window.removeEventListener('keydown', handleEsc);
-    }, []);
-
-    const [lastSubmitTime, setLastSubmitTime] = useState(0);
-
     const formatTime = (ms) => {
         const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
         const minutes = Math.floor(totalSeconds / 60);
@@ -125,51 +109,8 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    const validateInputInternal = (inputStr) => {
-        const expectedType = question.input_type?.toLowerCase() || 'array';
-        let parsed;
-        let isValid = false;
-        try {
-            const trimmed = inputStr.trim();
-            if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || 
-                (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-                (!isNaN(trimmed) && trimmed.length > 0)) {
-                parsed = JSON.parse(trimmed);
-            } else if (expectedType === 'string') {
-                parsed = inputStr;
-                isValid = true;
-            } else {
-                parsed = JSON.parse(inputStr);
-            }
-        } catch (e) {
-            if (expectedType === 'string') {
-                parsed = inputStr;
-                isValid = true;
-            } else {
-                return { error: "Invalid JSON format. Check brackets and quotes for " + expectedType.toUpperCase() + " type." };
-            }
-        }
-        if (!isValid) {
-            switch(expectedType) {
-                case "array": isValid = Array.isArray(parsed); break;
-                case "number": isValid = typeof parsed === "number"; break;
-                case "string": isValid = typeof parsed === "string"; break;
-                case "matrix": isValid = Array.isArray(parsed) && (parsed.length === 0 || Array.isArray(parsed[0])); break;
-                case "object": isValid = typeof parsed === "object" && !Array.isArray(parsed) && parsed !== null; break;
-                default: isValid = true;
-            }
-        }
-        if (!isValid) return { error: `Type Mismatch: Expected ${expectedType.toUpperCase()}` };
-        return { success: true, parsed };
-    };
-
     const runCustomTest = async () => {
         if (!bbInput) return;
-        const validation = validateInputInternal(bbInput);
-        if (validation.error) {
-            setBbOutput(`Error: ${validation.error}`);
-            return;
-        }
         setBbRunning(true);
         try {
             const res = await axios.post(`${API_BASE_URL}/api/challenges/run`, {
@@ -179,11 +120,10 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
             if (res.data.success) {
                 setBbOutput(res.data.output);
             } else {
-                setBbOutput(`Error: ${res.data.error}${res.data.hint ? `\nHint: ${res.data.hint}` : ''}`);
+                setBbOutput(`Error: ${res.data.error}`);
             }
         } catch (err) {
-            const serverErr = err.response?.data;
-            setBbOutput(serverErr?.error ? `Error: ${serverErr.error}${serverErr.hint ? `\nHint: ${serverErr.hint}` : ''}` : "Evaluation Error");
+            setBbOutput("Evaluation Error");
         } finally {
             setBbRunning(false);
         }
@@ -191,11 +131,6 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
 
     const runMyTest = async () => {
         if (!bbInput) return;
-        const validation = validateInputInternal(bbInput);
-        if (validation.error) {
-            setBbOutput(`Error: ${validation.error}`);
-            return;
-        }
         setTestRunning(true);
         try {
             const res = await axios.post(`${API_BASE_URL}/api/challenges/test-code`, {
@@ -207,11 +142,10 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
             if (res.data.success) {
                 setBbOutput(res.data.output);
             } else {
-                setBbOutput(`Error: ${res.data.error}${res.data.hint ? `\nHint: ${res.data.hint}` : ''}`);
+                setBbOutput(`Error: ${res.data.error}`);
             }
         } catch (err) {
-            const serverErr = err.response?.data;
-            setBbOutput(serverErr?.error ? `Error: ${serverErr.error}${serverErr.hint ? `\nHint: ${serverErr.hint}` : ''}` : "Evaluation Error");
+            setBbOutput("Evaluation Error");
         } finally {
             setTestRunning(false);
         }
@@ -219,87 +153,43 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
 
     const submitSolution = async () => {
         const now = Date.now();
-        if (submitting || (now - lastSubmitTime < 2000)) return;
-        setLastSubmitTime(now);
+        if (submitting) return;
         setSubmitting(true);
         setFeedback(null);
-        const payload = {
-            question_id: qId,
-            code: code,
-            language: selectedLanguage
-        };
-        const attemptSubmit = async (retryCount = 0) => {
-            try {
-                const res = await axios.post(`${API_BASE_URL}/api/challenges/submit`, payload, {
-                    timeout: 15000 
-                });
-                setFeedback({
-                    success: res.data.success,
-                    score: res.data.score,
-                    error: res.data.error,
-                    expected: res.data.expected,
-                    received: res.data.received
-                });
-                if (res.data.success) {
-                    if (timerRef.current) clearInterval(timerRef.current);
-                    
-                    // Clear specific language caches for THIS question on success
-                    const langs = ['java', 'python', 'javascript', 'cpp', 'c'];
-                    langs.forEach(l => {
-                        localStorage.removeItem(`spectra_code_${qId}_${l}`);
-                    });
-                    localStorage.removeItem(`spectra_active_lang_${qId}`);
-                    localStorage.removeItem(`spectra_bb_${qId}`);
-                    
-                    setSubmitting(false);
-                    if (index + 1 === total) {
-                        setTimeout(() => onComplete(), 1000);
-                    }
-                    setTimeout(() => onRefresh(), 2000);
-                } else {
-                    setSubmitting(false);
-                }
-            } catch (err) {
-                if (retryCount === 0 && (!err.response || err.code === 'ECONNABORTED')) {
-                    return attemptSubmit(1);
-                }
-                setFeedback({ success: false, error: err.response?.data?.error || "Network Error — Submission failed. Try again." });
-                setSubmitting(false);
+        try {
+            const res = await axios.post(`${API_BASE_URL}/api/challenges/submit`, {
+                question_id: qId,
+                code: code,
+                language: selectedLanguage
+            });
+            setFeedback({
+                success: res.data.success,
+                score: res.data.score,
+                error: res.data.error,
+                expected: res.data.expected,
+                received: res.data.received
+            });
+            if (res.data.success) {
+                const langs = ['java', 'python', 'javascript', 'cpp', 'c'];
+                langs.forEach(l => localStorage.removeItem(`spectra_code_${qId}_${l}`));
+                localStorage.removeItem(`spectra_active_lang_${qId}`);
+                localStorage.removeItem(`spectra_bb_${qId}`);
+                setTimeout(() => onRefresh(), 2000);
             }
-        };
-        await attemptSubmit();
+        } catch (err) {
+            setFeedback({ success: false, error: "Submission failed. Try again." });
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const skipQuestion = async () => {
-        if (!window.confirm("Are you sure? Skipping locks this data node securely. You cannot return.")) return;
+        if (!window.confirm("Are you sure? This cannot be undone.")) return;
         setSkipping(true);
         try {
             await axios.post(`${API_BASE_URL}/api/challenges/skip`, { question_id: qId });
-            
-            // Clear caches
-            const langs = ['java', 'python', 'javascript', 'cpp', 'c'];
-            langs.forEach(l => {
-                localStorage.removeItem(`spectra_code_${qId}_${l}`);
-            });
-            localStorage.removeItem(`spectra_active_lang_${qId}`);
-            localStorage.removeItem(`spectra_bb_${qId}`);
-            
             onRefresh();
-        } catch (err) {
-            setSkipping(false);
-        }
-    };
-
-    const formatOutput = (val) => {
-        if (val === null || val === undefined) return "N/A";
-        if (typeof val === 'object') return JSON.stringify(val, null, 2);
-        try {
-            const parsed = JSON.parse(val);
-            if (typeof parsed === 'object') return JSON.stringify(parsed, null, 2);
-            return String(val);
-        } catch (e) {
-            return String(val);
-        }
+        } catch (err) {} finally { setSkipping(false); }
     };
 
     return (
@@ -307,143 +197,80 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
             <div className="left-pane">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0' }}>
                     <img src={logo} alt="SL" style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--primary)' }} />
-                    <span className="text-label" style={{ fontWeight: '800', fontSize: '12px', color: 'var(--primary)', letterSpacing: '2px' }}>SPECTRALABS CONTEST</span>
+                    <span className="text-label" style={{ fontWeight: '800', fontSize: '12px', color: 'var(--primary)', letterSpacing: '2px' }}>CONTEST SYSTEM</span>
                 </div>
 
                 <div className="glass-card" style={{ padding: '1.5rem' }}>
                     <div className="flex-between" style={{ marginBottom: '1rem' }}>
                         <div>
-                            <span className="text-label" style={{ display: 'block', marginBottom: '4px' }}>
-                                {index + 1}
-                            </span>
+                            <span className="text-label" style={{ display: 'block', marginBottom: '4px' }}>{index + 1}</span>
                             <h2 className="heading-title">{question.title}</h2>
                         </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end' }}>
-                            <div className="glass-pill" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', padding: '4px 10px', color: 'var(--primary)' }}>
-                                <Clock size={12} />
-                                {formatTime(elapsedTime)}
-                            </div>
-                            <span style={{ 
-                                fontSize: '11px', 
-                                padding: '4px 10px', 
-                                borderRadius: '12px', 
-                                background: 'var(--bg-elevated)',
-                                color: question.difficulty === 'Easy' ? 'var(--success)' : question.difficulty === 'Medium' ? '#ffcc00' : 'var(--error)',
-                                border: '1px solid currentColor',
-                                fontWeight: '600'
-                            }}>
-                                {question.difficulty}
-                            </span>
+                        <div className="glass-pill" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', padding: '4px 10px', color: 'var(--primary)' }}>
+                            <Clock size={12} /> {formatTime(elapsedTime)}
                         </div>
                     </div>
                     
                     <p className="text-body text-muted" style={{ marginBottom: '1.5rem', fontSize: '14px' }}>
-                        Deduce the hidden pattern by utilizing the SpectraLabs Sandbox below. Construct the precise algorithm when ready.
+                        Solve the logic by using the Sandbox below. Click submit when your code is ready.
                     </p>
 
                     <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         <div className="glass-card" style={{ padding: '1rem', border: '1px solid rgba(0, 245, 255, 0.15)', background: 'rgba(0,0,0,0.2)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
                                 <Database size={14} color="var(--primary)" />
-                                <h4 style={{ fontSize: '11px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '2px' }}>CONTEST_DATA_SPECIFICATION</h4>
+                                <h4 style={{ fontSize: '11px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '2px' }}>QUESTION DETAILS</h4>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                                 <div>
-                                    <span style={{ fontSize: '9px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>INPUT_TYPE</span>
-                                    <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--success)', fontFamily: 'var(--font-mono)' }}>{question.input_type?.toUpperCase() || 'ARRAY'}</span>
+                                    <span style={{ fontSize: '9px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>TYPE</span>
+                                    <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{question.input_type?.toUpperCase() || 'ARRAY'}</span>
                                 </div>
                                 <div>
-                                    <span style={{ fontSize: '9px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>CONSTRAINTS</span>
-                                    <span style={{ fontSize: '11px', color: 'var(--text-main)', fontWeight: '600' }}>{question.constraints || 'N/A'}</span>
+                                    <span style={{ fontSize: '9px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>RULES</span>
+                                    <span style={{ fontSize: '11px', fontWeight: '600' }}>{question.constraints || 'N/A'}</span>
                                 </div>
-                            </div>
-
-                            <div style={{ marginBottom: '1rem' }}>
-                                <span style={{ fontSize: '9px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>INPUT_FORMAT</span>
-                                <div style={{ fontSize: '12px', lineHeight: '1.4', color: 'var(--text-main)' }}>{question.input_format || 'Deduce from provided data samples.'}</div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div>
-                                    <span style={{ fontSize: '9px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>EXAMPLE_INPUT</span>
-                                    <div style={{ background: '#000', padding: '0.6rem', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--primary)', boxShadow: 'inset 0 0 5px rgba(0, 245, 255, 0.1)' }}>
-                                        {question.example_input || 'N/A'}
-                                    </div>
+                                    <span style={{ fontSize: '9px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>SAMPLE INPUT</span>
+                                    <div style={{ background: '#000', padding: '0.6rem', borderRadius: '4px', fontSize: '11px', color: 'var(--primary)' }}>{question.example_input || 'N/A'}</div>
                                 </div>
                                 <div>
-                                    <span style={{ fontSize: '9px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>EXAMPLE_OUTPUT</span>
-                                    <div style={{ background: '#000', padding: '0.6rem', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--success)' }}>
-                                        {question.example_output || 'N/A'}
-                                    </div>
+                                    <span style={{ fontSize: '9px', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>SAMPLE OUTPUT</span>
+                                    <div style={{ background: '#000', padding: '0.6rem', borderRadius: '4px', fontSize: '11px', color: 'var(--success)' }}>{question.example_output || 'N/A'}</div>
                                 </div>
                             </div>
                         </div>
-
-                        {JSON.parse(question.examples || "[]").length > 0 && (
-                            <div style={{ padding: '0 1rem' }}>
-                                <h5 style={{ fontSize: '9px', color: 'var(--muted)', marginBottom: '0.5rem' }}>ADDITIONAL_PROBES</h5>
-                                {JSON.parse(question.examples || "[]").map((ex, i) => (
-                                    <div key={i} style={{ marginBottom: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)', opacity: 0.7 }}>
-                                        <span className="text-muted">In: {JSON.stringify(ex.input)}</span> | <span className="text-success">Out: {JSON.stringify(ex.output)}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
                     </div>
                 </div>
 
                 <div className="glass-card" style={{ padding: '1.5rem', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.2rem' }}>
                         <Zap size={16} color="var(--accent)" />
-                        <h3 className="heading-section">SpectraLabs Sandbox</h3>
+                        <h3 className="heading-section">Sandbox</h3>
                     </div>
 
                     <div style={{ marginBottom: '1rem' }}>
-                        <label className="text-label" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '11px' }}>PROBE INPUT</label>
-                        <textarea 
-                            value={bbInput}
-                            onChange={(e) => handleBbInputChange(e.target.value)}
-                            placeholder="Input JSON data structure here..."
-                            style={{ width: '100%', minHeight: '80px', resize: 'vertical', fontSize: '13px' }}
-                        />
+                        <label className="text-label" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '11px' }}>TEST INPUT</label>
+                        <textarea value={bbInput} onChange={(e) => handleBbInputChange(e.target.value)} placeholder="Type input here..." style={{ width: '100%', minHeight: '80px', resize: 'vertical', fontSize: '13px' }} />
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.8rem' }}>
-                        <button 
-                            onClick={runCustomTest}
-                            disabled={bbRunning || testRunning || submitting || skipping}
-                            className="btn-accent"
-                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.8rem', fontSize: '13px' }}
-                        >
-                            {bbRunning ? <Activity className="animate-spin" size={16} /> : <Zap size={16} />}
-                            Hidden Logic
+                        <button onClick={runCustomTest} disabled={bbRunning} className="btn-accent" style={{ flex: 1, padding: '0.8rem', fontSize: '13px' }}>
+                            {bbRunning ? "Running..." : "Test Patterns"}
                         </button>
-                        
-                        <button 
-                            onClick={runMyTest}
-                            disabled={bbRunning || testRunning || submitting || skipping}
-                            className="btn-primary"
-                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.8rem', fontSize: '13px' }}
-                        >
-                            {testRunning ? <Activity className="animate-spin" size={16} /> : <Play size={16} />}
-                            Test Code
+                        <button onClick={runMyTest} disabled={testRunning} className="btn-primary" style={{ flex: 1, padding: '0.8rem', fontSize: '13px' }}>
+                            {testRunning ? "Testing..." : "Test Code"}
                         </button>
                     </div>
 
                     {bbOutput !== null && (
                         <div style={{ marginTop: '1.2rem', padding: '1rem', background: 'var(--bg-main)', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                            <label className="text-label" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '11px' }}>SYSTEM OUTPUT</label>
-                            <pre style={{ 
-                                fontFamily: 'var(--font-mono)', 
-                                color: String(bbOutput).startsWith('Error:') ? 'var(--error)' : 'var(--primary)', 
-                                wordBreak: 'break-all',
-                                whiteSpace: 'pre-wrap',
-                                fontSize: '12px',
-                                margin: 0
-                            }}>
-                                {typeof bbOutput === 'object' ? JSON.stringify(bbOutput, null, 2) : String(bbOutput)}
-                            </pre>
+                            <label className="text-label" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '11px' }}>RESULT</label>
+                            <pre style={{ color: 'var(--primary)', fontSize: '12px', margin: 0 }}>{String(bbOutput)}</pre>
                         </div>
                     )}
                 </div>
@@ -452,110 +279,28 @@ export const EditorPanel = ({ question, index, total, onRefresh, onComplete }) =
             <div className="right-pane">
                 <div className="glass solution-editor-card">
                     <div style={{ background: 'var(--bg-elevated)', padding: '0.8rem 1.5rem', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="heading-section" style={{ fontSize: '14px' }}>Solution Editor</span>
-                        <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                            <select 
-                                value={selectedLanguage}
-                                onChange={(e) => handleLanguageChange(e.target.value)}
-                                style={{
-                                    background: 'var(--bg-main)',
-                                    color: 'var(--primary)',
-                                    border: '1px solid var(--glass-border)',
-                                    borderRadius: '6px',
-                                    padding: '4px 8px',
-                                    fontSize: '11px',
-                                    fontWeight: 'bold',
-                                    outline: 'none',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <option value="java">JAVA</option>
-                                <option value="python">PYTHON</option>
-                                <option value="javascript">JAVASCRIPT</option>
-                                <option value="cpp">C++</option>
-                                <option value="c">C</option>
-                            </select>
-                        </div>
+                        <span className="heading-section" style={{ fontSize: '14px' }}>Write Code</span>
+                        <select value={selectedLanguage} onChange={(e) => handleLanguageChange(e.target.value)} style={{ background: 'var(--bg-main)', color: 'var(--primary)', padding: '4px 8px', fontSize: '11px', borderRadius: '6px' }}>
+                            <option value="java">JAVA</option>
+                            <option value="python">PYTHON</option>
+                            <option value="javascript">JAVASCRIPT</option>
+                            <option value="cpp">C++</option>
+                            <option value="c">C</option>
+                        </select>
                     </div>
-                    <div style={{ flex: 1 }}>
-                        <Editor
-                            height="100%"
-                            language={selectedLanguage}
-                            theme="vs-dark"
-                            value={code}
-                            onChange={(val) => handleCodeChange(val)}
-                            options={{
-                                minimap: { enabled: false },
-                                fontSize: 14,
-                                fontFamily: 'var(--font-mono)',
-                                padding: { top: 20 },
-                                lineNumbers: 'on',
-                                scrollBeyondLastLine: false,
-                                automaticLayout: true,
-                                backgroundColor: 'transparent',
-                                borderRadius: '8px'
-                            }}
-                        />
-                    </div>
+                    <Editor height="100%" language={selectedLanguage} theme="vs-dark" value={code} onChange={(val) => handleCodeChange(val)} options={{ minimap: { enabled: false }, fontSize: 14 }} />
                 </div>
 
                 {feedback && (
-                    <div className="glass animate-fade-in" style={{ 
-                        padding: '1.2rem', 
-                        borderLeft: `4px solid ${feedback.success ? 'var(--success)' : 'var(--error)'}`,
-                        background: feedback.success ? 'rgba(52, 211, 153, 0.05)' : 'rgba(248, 113, 113, 0.05)',
-                        borderRadius: '8px'
-                    }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h4 style={{ color: feedback.success ? 'var(--success)' : 'var(--error)', fontSize: '14px', fontWeight: '600' }}>
-                                {feedback.success ? 'CONTEST SUCCESS' : 'SYSTEM MALFUNCTION: TEST FAILED'}
-                            </h4>
-                            {feedback.success && <span style={{ fontWeight: 'bold', color: 'var(--success)', fontSize: '14px' }}>+{feedback.score} XP</span>}
-                        </div>
-                        {feedback.error && (
-                            <div style={{ marginTop: '1rem', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-                                <div style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>DIAGNOSTICS: {feedback.error}</div>
-                                {feedback.received !== undefined && (
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                        <div>
-                                            <span style={{ fontSize: '9px', color: 'var(--muted)', display: 'block' }}>EXPECTED</span>
-                                            <pre style={{ background: '#000', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--success)', color: 'var(--success)', whiteSpace: 'pre-wrap', maxHeight: '100px', overflowY: 'auto' }}>
-                                                {formatOutput(feedback.expected)}
-                                            </pre>
-                                        </div>
-                                        <div>
-                                            <span style={{ fontSize: '9px', color: 'var(--muted)', display: 'block' }}>RECEIVED</span>
-                                            <pre style={{ background: '#000', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--error)', color: 'var(--error)', whiteSpace: 'pre-wrap', maxHeight: '100px', overflowY: 'auto' }}>
-                                                {formatOutput(feedback.received)}
-                                            </pre>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                    <div className="glass animate-fade-in" style={{ padding: '1.2rem', borderLeft: `4px solid ${feedback.success ? 'var(--success)' : 'var(--error)'}`, background: 'rgba(255,255,255,0.02)' }}>
+                        <h4 style={{ color: feedback.success ? 'var(--success)' : 'var(--error)', fontSize: '14px' }}>{feedback.success ? 'CORRECT' : 'WRONG ANSWER'}</h4>
+                        {!feedback.success && feedback.error && <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '0.5rem' }}>Reason: {feedback.error}</div>}
                     </div>
                 )}
 
                 <div style={{ display: 'flex', gap: '1rem', flexShrink: 0 }}>
-                    <button 
-                        onClick={skipQuestion}
-                        disabled={submitting || skipping || feedback?.success}
-                        className="btn-accent"
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem', padding: '1rem', fontSize: '14px' }}
-                    >
-                        {skipping ? <Activity className="animate-spin" size={18} /> : <FastForward size={18} />}
-                        Skip Question
-                    </button>
-
-                    <button 
-                        onClick={submitSolution}
-                        disabled={submitting || skipping || feedback?.success}
-                        className="btn-primary"
-                        style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem', padding: '1rem', fontSize: '14px' }}
-                    >
-                        {submitting ? <Activity className="animate-spin" size={18} /> : <Send size={18} />}
-                        {submitting ? "UPLOADING DATA..." : "Finalize Question"}
-                    </button>
+                    <button onClick={skipQuestion} disabled={submitting || skipping} className="btn-accent" style={{ flex: 1, padding: '1rem' }}>Skip</button>
+                    <button onClick={submitSolution} disabled={submitting} className="btn-primary" style={{ flex: 2, padding: '1rem' }}>Submit Code</button>
                 </div>
             </div>
         </div>
