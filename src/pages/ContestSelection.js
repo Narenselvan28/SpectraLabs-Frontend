@@ -34,69 +34,110 @@ const ContestSelection = () => {
     }, [fetchContests]);
 
     return (
-        <div className="contest-selection-page" style={{ padding: '6rem 2rem', minHeight: '100vh', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div className="contest-selection-page" style={{ 
+            padding: '6rem 2rem', 
+            minHeight: '100vh', 
+            background: 'var(--bg-main)', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            position: 'relative',
+            overflowX: 'hidden'
+        }}>
+            <div className="scanline" />
             
-            <header style={{ textAlign: 'center', marginBottom: '5rem' }}>
-                <div className="animate-fade-in" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1.5rem', background: 'rgba(74, 222, 128, 0.05)', padding: '0.6rem 1.5rem', borderRadius: '30px', border: '1px solid var(--glass-border)' }}>
-                    <Cpu size={18} color="var(--primary)" />
-                    <span className="text-label" style={{ color: 'var(--primary)' }}>Available Arenas</span>
-                </div>
-                <h1 className="heading-title" style={{ fontSize: '3rem', letterSpacing: '-0.03em' }}>Select Your Mission</h1>
-                <p className="text-muted" style={{ marginTop: '0.5rem' }}>Synchronize with an active arena to begin the evaluation.</p>
+            <header style={{ textAlign: 'center', marginBottom: '4rem', zIndex: 5 }}>
+                <motion.div 
+                    initial={{ opacity: 0, y: -10 }} 
+                    animate={{ opacity: 1, y: 0 }} 
+                    style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '0.8rem', 
+                        marginBottom: '1.5rem', 
+                        background: 'rgba(74, 222, 128, 0.05)', 
+                        padding: '0.6rem 1.5rem', 
+                        borderRadius: '30px', 
+                        border: '1px solid var(--glass-border)' 
+                    }}
+                >
+                    <Cpu size={16} color="var(--primary)" />
+                    <span className="text-label" style={{ color: 'var(--primary)' }}>OPERATIONAL_ARENAS</span>
+                </motion.div>
+                <h1 className="heading-title" style={{ fontSize: '3rem', fontWeight: '900', letterSpacing: '-1.5px', marginBottom: '1rem' }}>Select Your Mission</h1>
+                <p className="text-muted" style={{ fontSize: '16px', maxWidth: '500px', margin: '0 auto', lineHeight: '1.6' }}>Choose an available data node to begin the reverse-engineering evaluation.</p>
             </header>
 
             <button 
                 onClick={fetchContests} 
                 className="btn-accent" 
-                style={{ padding: '1rem 2.5rem', display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '4rem' }}
+                style={{ 
+                    padding: '1rem 2.5rem', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '1rem', 
+                    marginBottom: '4rem',
+                    borderRadius: '50px',
+                    zIndex: 5
+                }}
             >
                 <RefreshCw size={18} className={scanning ? "animate-spin" : ""} />
-                {scanning ? "Scanning Uplinks..." : "Refresh Arenas"}
+                {scanning ? "SCANNING_UPLINKS..." : "REFRESH_SYSTEM"}
             </button>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '2.5rem', maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
+            <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', 
+                gap: '2rem', 
+                maxWidth: '1200px', 
+                width: '100%', 
+                margin: '0 auto',
+                zIndex: 5
+            }}>
                 {contests.length === 0 && !scanning && (
-                    <div className="glass" style={{ padding: '4rem', gridColumn: '1 / -1', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        No active arenas are currently broadcasting.
+                    <div className="glass-card" style={{ padding: '4rem', gridColumn: '1 / -1', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <Terminal size={48} style={{ marginBottom: '1.5rem', opacity: 0.2 }} />
+                        <div className="text-label">NO_ARENAS_DETECTED</div>
                     </div>
                 )}
 
-                {contests.map(c => (
+                {contests.map((c, idx) => (
                     <motion.div
                         key={c.id}
-                        whileHover={{ y: -5, borderColor: 'var(--primary)' }}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        whileHover={{ y: -5, borderColor: 'var(--primary)', boxShadow: '0 10px 30px rgba(74, 222, 128, 0.1)' }}
                         onClick={() => selectContest(c)}
                         className="glass-card"
-                        style={{ padding: '2.5rem', cursor: 'pointer', borderTop: '4px solid var(--primary-soft)' }}
+                        style={{ padding: '2.5rem', cursor: 'pointer', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column' }}
                     >
-                        <div style={{ marginBottom: '2rem' }}>
-                            <h2 className="heading-section" style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>{c.name}</h2>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'var(--text-muted)', fontSize: '12px' }}>
-                                <Terminal size={14} />
-                                <span style={{ fontFamily: 'var(--font-mono)' }}>ID: {c.id}</span>
+                        <div style={{ marginBottom: '2rem', flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                <h2 style={{ fontSize: '1.6rem', fontWeight: '900', margin: 0 }}>{c.name}</h2>
+                                <div style={{ 
+                                    fontSize: '9px', 
+                                    padding: '4px 10px', 
+                                    borderRadius: '50px', 
+                                    background: 'rgba(0,0,0,0.3)', 
+                                    border: `1px solid ${c.is_active ? 'var(--primary)' : '#444'}`, 
+                                    color: c.is_active ? 'var(--primary)' : '#444', 
+                                    fontWeight: '900' 
+                                }}>
+                                    {c.is_active ? 'ONLINE' : 'STANDBY'}
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'var(--text-muted)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                                <Terminal size={12} />
+                                <span>ID: {c.id}</span>
                                 <span>&bull;</span>
-                                <span>{c.duration} mins</span>
+                                <span>{c.duration} MINS</span>
                             </div>
                         </div>
 
-                        <div className="glass" style={{ 
-                            background: 'rgba(15, 42, 26, 0.2)', 
-                            padding: '1rem', 
-                            borderRadius: '10px', 
-                            marginBottom: '2rem',
-                            fontSize: '13px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                        }}>
-                            <span className="text-label" style={{ fontSize: '10px' }}>Status:</span>
-                            <span style={{ color: c.is_active ? 'var(--success)' : '#eab308', fontWeight: '700' }}>
-                                {c.is_active ? 'Online' : 'Standby'}
-                            </span>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', color: 'var(--primary)', fontWeight: '700', fontSize: '14px' }}>
-                            Initialize Connection <ArrowRight size={18} />
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--primary)', fontWeight: '900', fontSize: '13px', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <span>INITIALIZE_CONNECTION</span>
+                            <ArrowRight size={18} />
                         </div>
                     </motion.div>
                 ))}
